@@ -1,0 +1,25 @@
+{
+  "model_type": "gpt2",
+  "model_name": "gpt2-medium",
+  "allowed_models": [
+    "distilgpt2",
+    "gpt2",
+    "gpt2-medium",
+    "gpt2-large",
+    "gpt2-xl",
+    "microsoft/DialoGPT-small",
+    "microsoft/DialoGPT-medium",
+    "microsoft/DialoGPT-large"
+  ],
+  "train_file": "data/gpt-dialogues/train.txt",
+  "eval_file": "data/gpt-dialogues/dev.txt",
+  "output_dir_template": "output_model/{model_name}_finetuned",
+  "num_epochs": 4.0,
+  "train_batch_size": 6,
+  "eval_batch_size": 6,
+  "learning_rate": 1e-5,
+  "logging_steps": 5000,
+  "save_steps": 5000,
+  "overwrite_output_dir": true,
+  "line_by_line": true
+}
