@@ -1,0 +1,38 @@
+__pycache__/
+*.py[cod]
+*.so
+.Python
+.venv/
+venv/
+env/
+emo-model/
+genuine-gpt2/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Logs and run artifacts
+logs/
+*.log
+runs/
+
+# Model artifacts (large files)
+model/
+output_model/
+*.bin
+*.pt
+*.ckpt
+
+# Datasets (keep folder structure, ignore content by default)
+data/*
+!data/.gitkeep
+!data/README.md
+!data/gpt-dialogues/
+data/gpt-dialogues/*
+!data/gpt-dialogues/.gitkeep
+
+# Temporary / backups
+*.save
+*.tmp
