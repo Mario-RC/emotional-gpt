@@ -1,21 +1,6 @@
-# finetune_dialogpt
+# Emotional GPT
 
 Fine-tuning and text generation with GPT-2 and DialoGPT models using Hugging Face Transformers.
-
-## Project structure
-
-```text
-finetune_dialogpt/
-├── configs/               # Training configuration files (JSON)
-│   └── train_model.json
-├── data/                  # Local datasets (not versioned by default)
-├── logs/                  # Run logs (not versioned)
-├── scripts/               # Executable training/generation scripts
-├── src/                   # Python source code
-├── init_venv.sh           # Virtual environment activation helper
-├── requirements.txt       # Python dependencies (pinned)
-└── .gitignore
-```
 
 ## Requirements
 
@@ -27,22 +12,7 @@ finetune_dialogpt/
 pip install -r requirements.txt
 ```
 
-If your environment has a broken `pip`, repair it first:
-
-```bash
-python3 -m ensurepip --upgrade
-python3 -m pip install --upgrade pip
-pip install -r requirements.txt
-```
-
 ## Dataset build workflow
-
-The training scripts expect:
-
-- `data/gpt-dialogues/train.txt`
-- `data/gpt-dialogues/dev.txt`
-
-These are generated from the DailyDialog raw CSV files.
 
 ### 1. Download raw CSV files
 
@@ -88,6 +58,11 @@ python src/build_dataset.py \
   --dev-size 0.2 \
   --seed 42
 ```
+
+These script generates the train and dev data from the DailyDialog raw CSV files.
+
+- `data/gpt-dialogues/train.txt`
+- `data/gpt-dialogues/dev.txt`
 
 ## Train one model
 
@@ -153,3 +128,18 @@ Defaults:
 - `NUM_RETURN_SEQUENCES=5`
 - `MAX_LENGTH=128`
 - `TEMPERATURE=0.8`
+
+## Project structure
+
+```text
+emotional_gpt/
+├── configs/               # Training configuration files (JSON)
+│   └── train_model.json
+├── data/                  # Local datasets (not versioned by default)
+├── logs/                  # Run logs (not versioned)
+├── scripts/               # Executable training/generation scripts
+├── src/                   # Python source code
+├── init_venv.sh           # Virtual environment activation helper
+├── requirements.txt       # Python dependencies (pinned)
+└── .gitignore
+```
