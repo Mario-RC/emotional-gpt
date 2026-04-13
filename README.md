@@ -12,7 +12,7 @@ Fine-tuning and text generation with GPT-2 and DialoGPT models using Hugging Fac
 pip install -r requirements.txt
 ```
 
-## Dataset build workflow
+## Dataset Workflow
 
 ### 1. Download raw CSV files
 
@@ -36,7 +36,7 @@ data/raw/DAILYD_dialoginfo.csv
 python src/build_dataset.py
 ```
 
-`build_dataset.py` defaults:
+Default arguments in `src/build_dataset.py`:
 
 - `--data-dir data/raw`
 - `--main-file DAILYD_main.csv`
@@ -44,8 +44,6 @@ python src/build_dataset.py
 - `--output-dir data/gpt-dialogues`
 - `--dev-size 0.2`
 - `--seed 42`
-
-The script also accepts `DAILYD_*` naming if those files already exist in `data/raw`.
 
 Equivalent explicit command:
 
@@ -59,18 +57,18 @@ python src/build_dataset.py \
   --seed 42
 ```
 
-These script generates the train and dev data from the DailyDialog raw CSV files.
+This script generates:
 
 - `data/gpt-dialogues/train.txt`
 - `data/gpt-dialogues/dev.txt`
 
-## Train one model
+## Train a Model
 
 ```bash
 bash scripts/train_model.sh
 ```
 
-Default values are loaded from `configs/train_model.json`:
+Defaults are loaded from `configs/train_model.json`:
 
 - `model_type=gpt2`
 - `model_name=gpt2-medium`
@@ -87,7 +85,13 @@ Default values are loaded from `configs/train_model.json`:
 - `overwrite_output_dir=true`
 - `line_by_line=true`
 
-You can override any value per run using environment variables:
+Run with an explicit config path:
+
+```bash
+CONFIG_PATH=configs/train_model.json bash scripts/train_model.sh
+```
+
+Override values per run using environment variables:
 
 ```bash
 MODEL_NAME=gpt2-large \
@@ -99,13 +103,7 @@ LEARNING_RATE=5e-5 \
 bash scripts/train_model.sh
 ```
 
-To use a different config file:
-
-```bash
-CONFIG_PATH=configs/train_model.json bash scripts/train_model.sh
-```
-
-Supported `MODEL_NAME` values (validated against `allowed_models` in config):
+Supported `MODEL_NAME` values (validated against `allowed_models`):
 
 - `distilgpt2`
 - `gpt2`
@@ -116,7 +114,7 @@ Supported `MODEL_NAME` values (validated against `allowed_models` in config):
 - `microsoft/DialoGPT-medium`
 - `microsoft/DialoGPT-large`
 
-## Generate sample outputs
+## Generate Sample Outputs
 
 ```bash
 bash scripts/generate_text_samples.sh
@@ -129,17 +127,17 @@ Defaults:
 - `MAX_LENGTH=128`
 - `TEMPERATURE=0.8`
 
-## Project structure
+## Project Structure
 
 ```text
 emotional_gpt/
 ├── configs/               # Training configuration files (JSON)
 │   └── train_model.json
-├── data/                  # Local datasets (not versioned by default)
-├── logs/                  # Run logs (not versioned)
+├── data/                  # Local datasets and generated splits
 ├── scripts/               # Executable training/generation scripts
 ├── src/                   # Python source code
-├── init_venv.sh           # Virtual environment activation helper
-├── requirements.txt       # Python dependencies (pinned)
+├── LICENSE
+├── README.md
+├── requirements.txt
 └── .gitignore
 ```
