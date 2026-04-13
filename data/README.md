@@ -10,6 +10,8 @@ Raw CSV files required to build them:
 - `data/raw/DAILYD_main.csv`
 - `data/raw/DAILYD_dialoginfo.csv`
 
+Source: https://github.com/CHANEL-JSALT-2020/datasets
+
 Build command:
 
 ```bash

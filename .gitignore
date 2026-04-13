@@ -32,6 +32,8 @@ data/*
 !data/gpt-dialogues/
 data/gpt-dialogues/*
 !data/gpt-dialogues/.gitkeep
+!data/raw/
+!data/raw/*.csv
 
 # Temporary / backups
 *.save

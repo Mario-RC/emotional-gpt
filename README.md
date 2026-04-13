@@ -131,13 +131,18 @@ Defaults:
 
 ```text
 emotional_gpt/
-├── configs/               # Training configuration files (JSON)
-│   └── train_model.json
-├── data/                  # Local datasets and generated splits
-├── scripts/               # Executable training/generation scripts
-├── src/                   # Python source code
-├── LICENSE
-├── README.md
-├── requirements.txt
-└── .gitignore
+├── configs/
+│   └── train_model.json              # Training defaults and allowed models
+├── data/
+│   ├── README.md                     # Dataset preparation notes
+│   └── gpt-dialogues/
+├── scripts/
+│   ├── train_model.sh                # Launches training with config/env overrides
+│   └── generate_text_samples.sh      # Generates text from a fine-tuned checkpoint
+└── src/
+    ├── build_dataset.py              # Builds train/dev splits from raw CSV files
+    ├── train_model.py                # Fine-tuning entrypoint
+    └── generate_text.py              # Inference / text generation entrypoint
 ```
+
+Local artifacts such as `emo-model/`, `output_model/`, `runs/`, and raw/generated dataset files are ignored by `.gitignore` and are not intended to be pushed to GitHub.
