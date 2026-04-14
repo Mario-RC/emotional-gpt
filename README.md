@@ -16,7 +16,7 @@ pip install -r requirements.txt
 
 ### 1. Download raw CSV files
 
-Source: https://github.com/CHANEL-JSALT-2020/datasets
+ DAILYD resources source: [`CHANEL-JSALT-2020/datasets`](https://github.com/CHANEL-JSALT-2020/datasets) 
 
 Required files:
 
