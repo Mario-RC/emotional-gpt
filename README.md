@@ -127,6 +127,12 @@ Defaults:
 - `MAX_LENGTH=128`
 - `TEMPERATURE=0.8`
 
+## Hugging Face Model
+
+The fine-tuned GPT-2 Medium model is available on Hugging Face:
+
+- [`mario-rc/emotional-gpt2-medium`](https://huggingface.co/mario-rc/emotional-gpt2-medium)
+
 ## Project Structure
 
 ```text
