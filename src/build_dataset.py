@@ -10,6 +10,17 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 
+EMOTION_LABELS = {
+    "0": "no emotion",
+    "1": "anger",
+    "2": "disgust",
+    "3": "fear",
+    "4": "happiness",
+    "5": "sadness",
+    "6": "surprise",
+}
+
+
 def resolve_existing_file(data_dir: Path, preferred_name: str, fallback_name: str) -> Path:
     preferred_path = data_dir / preferred_name
     fallback_path = data_dir / fallback_name
@@ -64,12 +75,41 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 def merge_emotion_if_possible(main_df: pd.DataFrame, info_df: pd.DataFrame) -> pd.DataFrame:
     out = main_df.copy()
-    if "emotion" in info_df.columns and len(info_df) == len(out):
+    if "emotion" in info_df.columns:
+        if len(info_df) != len(out):
+            raise ValueError(
+                "DAILYD_main.csv and DAILYD_dialoginfo.csv must have the same "
+                f"number of rows to align emotion labels. Got {len(out)} main "
+                f"rows and {len(info_df)} dialog info rows."
+            )
         out["emotion"] = info_df["emotion"].astype(str)
     return out
 
 
-def build_pair_samples(df: pd.DataFrame) -> list[str]:
+def normalize_emotion(value: object) -> str:
+    raw_value = str(value).strip().lower()
+    raw_value = raw_value.strip("<>")
+    raw_value = raw_value.replace("_", " ")
+
+    if raw_value in EMOTION_LABELS:
+        return EMOTION_LABELS[raw_value]
+    if raw_value in set(EMOTION_LABELS.values()):
+        return raw_value
+    if raw_value in {"", "nan", "none"}:
+        return EMOTION_LABELS["0"]
+
+    return raw_value
+
+
+def require_emotion_column(df: pd.DataFrame) -> None:
+    if "emotion" not in df.columns:
+        raise ValueError(
+            "Missing 'emotion' column. DAILYD_dialoginfo.csv must contain one "
+            "emotion label per utterance to build emotional training pairs."
+        )
+
+
+def build_plain_pair_samples(df: pd.DataFrame) -> list[str]:
     samples: list[str] = []
     grouped = df.groupby("dialog_id", sort=False)
 
@@ -84,12 +124,53 @@ def build_pair_samples(df: pd.DataFrame) -> list[str]:
     return samples
 
 
+def build_emotional_pair_samples(df: pd.DataFrame) -> list[str]:
+    require_emotion_column(df)
+    samples: list[str] = []
+    grouped = df.groupby("dialog_id", sort=False)
+
+    for _, dialog in grouped:
+        rows = dialog.to_dict("records")
+        for i in range(len(rows) - 1):
+            left = str(rows[i]["text"]).strip()
+            right = str(rows[i + 1]["text"]).strip()
+            if not left or not right:
+                continue
+
+            left_emotion = normalize_emotion(rows[i]["emotion"])
+            right_emotion = normalize_emotion(rows[i + 1]["emotion"])
+            samples.append(
+                f"<bos><{left_emotion}>{left}<sep>"
+                f"<{right_emotion}>{right}<|endoftext|>"
+            )
+
+    return samples
+
+
+def build_samples(df: pd.DataFrame, dataset_format: str) -> list[str]:
+    if dataset_format == "plain-pairs":
+        return build_plain_pair_samples(df)
+    if dataset_format == "emotional-pairs":
+        return build_emotional_pair_samples(df)
+    raise ValueError(f"Unsupported dataset format: {dataset_format}")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build train/dev files from DailyDialog CSV files.")
     parser.add_argument("--data-dir", type=Path, default=Path("data/raw"), help="Directory with raw CSV files.")
     parser.add_argument("--output-dir", type=Path, default=Path("data/gpt-dialogues"), help="Output directory.")
     parser.add_argument("--main-file", type=str, default="DAILYD_main.csv", help="Main CSV filename.")
     parser.add_argument("--info-file", type=str, default="DAILYD_dialoginfo.csv", help="Dialog info CSV filename.")
+    parser.add_argument(
+        "--format",
+        choices=["emotional-pairs", "plain-pairs"],
+        default="emotional-pairs",
+        help=(
+            "Output format. 'emotional-pairs' writes "
+            "'<bos><emotion>utterance<sep><emotion>reply<|endoftext|>'; "
+            "'plain-pairs' keeps the legacy 'utterance <eos> reply' format."
+        ),
+    )
     parser.add_argument("--dev-size", type=float, default=0.2, help="Validation split ratio.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for split.")
     return parser.parse_args()
@@ -106,7 +187,7 @@ def main() -> None:
     main_df = normalize_columns(main_df)
     main_df = merge_emotion_if_possible(main_df, info_df)
 
-    samples = build_pair_samples(main_df)
+    samples = build_samples(main_df, args.format)
     if not samples:
         raise ValueError("No training samples were generated from the input files.")
 
@@ -125,6 +206,7 @@ def main() -> None:
 
     print(f"Saved train: {train_path} ({len(train_samples)} rows)")
     print(f"Saved dev:   {dev_path} ({len(dev_samples)} rows)")
+    print(f"Format:      {args.format}")
 
 
 if __name__ == "__main__":

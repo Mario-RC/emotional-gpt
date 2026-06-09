@@ -5,6 +5,12 @@ Generated training files expected by training scripts:
 - `data/gpt-dialogues/train.txt`
 - `data/gpt-dialogues/dev.txt`
 
+By default, generated rows are emotion-conditioned dialogue pairs:
+
+```text
+<bos><source_emotion>source utterance<sep><target_emotion>target utterance<|endoftext|>
+```
+
 Raw CSV files required to build them:
 
 - `data/raw/DAILYD_main.csv`
@@ -22,3 +28,4 @@ Notes:
 
 - `src/build_dataset.py` reads from `data/raw` by default.
 - You can override paths with `--data-dir`, `--main-file`, `--info-file`, and `--output-dir`.
+- Use `--format plain-pairs` only if you need the old non-emotional `utterance <eos> reply` format.
