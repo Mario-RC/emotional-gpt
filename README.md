@@ -192,11 +192,12 @@ response emotion:
 <bos><fear>I just started a new job and I am a bit nervous.<sep><no emotion>
 ```
 
-## Hugging Face Model
+## Hugging Face Models
 
-The fine-tuned GPT-2 Medium model is available on Hugging Face:
+The fine-tuned GPT-2 models are available on Hugging Face:
 
 - [`mario-rc/emotional-gpt2-medium`](https://huggingface.co/mario-rc/emotional-gpt2-medium)
+- [`mario-rc/emotional-gpt2-large`](https://huggingface.co/mario-rc/emotional-gpt2-large)
 
 ## Project Structure
 
