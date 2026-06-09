@@ -166,6 +166,29 @@ def set_seed(args):
         torch.cuda.manual_seed_all(args.seed)
 
 
+def parse_special_tokens(tokens: str) -> List[str]:
+    return [token.strip() for token in tokens.split(",") if token.strip()]
+
+
+def add_configured_special_tokens(tokenizer: PreTrainedTokenizer, args) -> int:
+    special_tokens: Dict[str, object] = {}
+    additional_special_tokens = parse_special_tokens(args.additional_special_tokens)
+
+    if additional_special_tokens:
+        special_tokens["additional_special_tokens"] = additional_special_tokens
+    if args.pad_token:
+        special_tokens["pad_token"] = args.pad_token
+    if args.bos_token:
+        special_tokens["bos_token"] = args.bos_token
+    if args.eos_token:
+        special_tokens["eos_token"] = args.eos_token
+
+    if not special_tokens:
+        return 0
+
+    return tokenizer.add_special_tokens(special_tokens)
+
+
 def _sorted_checkpoints(args, checkpoint_prefix="checkpoint", use_mtime=False) -> List[str]:
     ordering_and_checkpoint_path = []
 
@@ -230,6 +253,41 @@ def mask_tokens(inputs: torch.Tensor, tokenizer: PreTrainedTokenizer, args) -> T
     return inputs, labels
 
 
+def build_language_modeling_batch(
+    batch: torch.Tensor, tokenizer: PreTrainedTokenizer, args
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    if args.mlm:
+        return mask_tokens(batch, tokenizer, args)
+
+    labels = batch.clone()
+    if tokenizer.pad_token_id is not None:
+        labels[labels == tokenizer.pad_token_id] = -100
+
+    return batch, labels
+
+
+def set_config_use_cache(model: PreTrainedModel, use_cache: bool) -> None:
+    config = getattr(model, "config", None)
+    if config is not None and hasattr(config, "use_cache"):
+        config.use_cache = use_cache
+
+
+def save_model_and_tokenizer(
+    args, model: PreTrainedModel, tokenizer: PreTrainedTokenizer, output_dir: str
+) -> None:
+    model_to_save = model.module if hasattr(model, "module") else model
+    original_use_cache = getattr(getattr(model_to_save, "config", None), "use_cache", None)
+
+    if args.gradient_checkpointing and original_use_cache is not None:
+        set_config_use_cache(model_to_save, True)
+
+    model_to_save.save_pretrained(output_dir)
+    tokenizer.save_pretrained(output_dir)
+
+    if args.gradient_checkpointing and original_use_cache is not None:
+        set_config_use_cache(model_to_save, original_use_cache)
+
+
 def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedTokenizer) -> Tuple[int, float]:
     """ Train the model """
     tb_writer = None
@@ -280,9 +338,13 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
         and os.path.isfile(os.path.join(args.model_name_or_path, "optimizer.pt"))
         and os.path.isfile(os.path.join(args.model_name_or_path, "scheduler.pt"))
     ):
-        # Load in optimizer and scheduler states
-        optimizer.load_state_dict(torch.load(os.path.join(args.model_name_or_path, "optimizer.pt")))
-        scheduler.load_state_dict(torch.load(os.path.join(args.model_name_or_path, "scheduler.pt")))
+        # Load states on CPU first to avoid transient CUDA OOM when resuming large models.
+        optimizer.load_state_dict(
+            torch.load(os.path.join(args.model_name_or_path, "optimizer.pt"), map_location="cpu")
+        )
+        scheduler.load_state_dict(
+            torch.load(os.path.join(args.model_name_or_path, "scheduler.pt"), map_location="cpu")
+        )
 
     if args.fp16:
         try:
@@ -316,6 +378,7 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
     logger.info("  Total optimization steps = %d", t_total)
 
     global_step = 0
+    starting_global_step = 0
     epochs_trained = 0
     steps_trained_in_current_epoch = 0
     # Check if continuing training from a checkpoint
@@ -324,13 +387,16 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
             # set global_step to gobal_step of last saved checkpoint from model path
             checkpoint_suffix = args.model_name_or_path.split("-")[-1].split("/")[0]
             global_step = int(checkpoint_suffix)
-            epochs_trained = global_step // (len(train_dataloader) // args.gradient_accumulation_steps)
-            steps_trained_in_current_epoch = global_step % (len(train_dataloader) // args.gradient_accumulation_steps)
+            starting_global_step = global_step
+            updates_per_epoch = max(1, len(train_dataloader) // args.gradient_accumulation_steps)
+            epochs_trained = global_step // updates_per_epoch
+            updates_trained_in_current_epoch = global_step % updates_per_epoch
+            steps_trained_in_current_epoch = updates_trained_in_current_epoch * args.gradient_accumulation_steps
 
             logger.info("  Continuing training from checkpoint, will skip to saved global_step")
             logger.info("  Continuing training from epoch %d", epochs_trained)
             logger.info("  Continuing training from global step %d", global_step)
-            logger.info("  Will skip the first %d steps in the first epoch", steps_trained_in_current_epoch)
+            logger.info("  Will skip the first %d batches in the first epoch", steps_trained_in_current_epoch)
         except ValueError:
             logger.info("  Starting fine-tuning.")
 
@@ -353,7 +419,7 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
                 steps_trained_in_current_epoch -= 1
                 continue
 
-            inputs, labels = mask_tokens(batch, tokenizer, args) if args.mlm else (batch, batch)
+            inputs, labels = build_language_modeling_batch(batch, tokenizer, args)
             inputs = inputs.to(args.device)
             labels = labels.to(args.device)
             model.train()
@@ -401,11 +467,7 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
                     # Save model checkpoint
                     output_dir = os.path.join(args.output_dir, "{}-{}".format(checkpoint_prefix, global_step))
                     os.makedirs(output_dir, exist_ok=True)
-                    model_to_save = (
-                        model.module if hasattr(model, "module") else model
-                    )  # Take care of distributed/parallel training
-                    model_to_save.save_pretrained(output_dir)
-                    tokenizer.save_pretrained(output_dir)
+                    save_model_and_tokenizer(args, model, tokenizer, output_dir)
 
                     torch.save(args, os.path.join(output_dir, "training_args.bin"))
                     logger.info("Saving model checkpoint to %s", output_dir)
@@ -426,7 +488,8 @@ def train(args, train_dataset, model: PreTrainedModel, tokenizer: PreTrainedToke
     if args.local_rank in [-1, 0] and tb_writer is not None:
         tb_writer.close()
 
-    return global_step, tr_loss / global_step
+    trained_global_steps = max(1, global_step - starting_global_step)
+    return global_step, tr_loss / trained_global_steps
 
 
 def evaluate(args, model: PreTrainedModel, tokenizer: PreTrainedTokenizer, prefix="") -> Dict:
@@ -464,7 +527,7 @@ def evaluate(args, model: PreTrainedModel, tokenizer: PreTrainedTokenizer, prefi
     model.eval()
 
     for batch in tqdm(eval_dataloader, desc="Evaluating"):
-        inputs, labels = mask_tokens(batch, tokenizer, args) if args.mlm else (batch, batch)
+        inputs, labels = build_language_modeling_batch(batch, tokenizer, args)
         inputs = inputs.to(args.device)
         labels = labels.to(args.device)
 
@@ -508,6 +571,10 @@ def main():
 
     parser.add_argument("--config_name", default=None, type=str, help="Optional pretrained config name or path if not the same as model_name_or_path. If both are None, initialize a new config.")
     parser.add_argument("--tokenizer_name", default=None, type=str, help="Optional pretrained tokenizer name or path if not the same as model_name_or_path. If both are None, initialize a new tokenizer.")
+    parser.add_argument("--additional_special_tokens", default="", type=str, help="Comma-separated list of additional special tokens to add to the tokenizer.")
+    parser.add_argument("--pad_token", default="", type=str, help="Optional pad token to add/set on the tokenizer.")
+    parser.add_argument("--bos_token", default="", type=str, help="Optional beginning-of-sequence token to add/set on the tokenizer.")
+    parser.add_argument("--eos_token", default="", type=str, help="Optional end-of-sequence token to add/set on the tokenizer.")
     parser.add_argument("--cache_dir", default=None, type=str, help="Optional directory to store the pre-trained models downloaded from s3 (instead of the default one)")
     parser.add_argument("--block_size", default=-1, type=int, help="Optional input sequence length after tokenization." "The training dataset will be truncated in block of this size for training." "Default to the model max input length for single sentence inputs (take into account special tokens).")
     parser.add_argument("--do_train", action="store_true", help="Whether to run training.")
@@ -517,6 +584,7 @@ def main():
     parser.add_argument("--per_gpu_train_batch_size", default=4, type=int, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--per_gpu_eval_batch_size", default=4, type=int, help="Batch size per GPU/CPU for evaluation.")
     parser.add_argument("--gradient_accumulation_steps", type=int, default=1, help="Number of updates steps to accumulate before performing a backward/update pass.")
+    parser.add_argument("--gradient_checkpointing", action="store_true", help="Enable gradient checkpointing to reduce activation memory during training.")
     parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
     parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
     parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
@@ -632,24 +700,7 @@ def main():
             "You are instantiating a new {} tokenizer. This is not supported, but you can do it from another script, save it,"
             "and load it from here, using --tokenizer_name".format(tokenizer_class.__name__)
         )
-    num_of_added_tokens = tokenizer.add_special_tokens(
-        {
-            "additional_special_tokens": [
-                "[TOPIC]",
-                "[/TOPIC]",
-                "[EMOTION]",
-                "[/EMOTION]",
-                "[DA]",
-                "[/DA]",
-                "[PERSONA]",
-                "[/PERSONA]",
-                "[KNOWLEDGE]",
-                "[/KNOWLEDGE]",
-                "[CLS]",
-                "[SEP]",
-            ]
-        }
-    )
+    num_of_added_tokens = add_configured_special_tokens(tokenizer, args)
     print("number of newly added tokens: {}".format(num_of_added_tokens))
     tokenizer_max_length = getattr(tokenizer, "model_max_length", None)
     if tokenizer_max_length is None or tokenizer_max_length <= 0:
@@ -670,6 +721,12 @@ def main():
     else:
         logger.info("Training new model from scratch")
         model = model_class(config=config)
+
+    if args.gradient_checkpointing:
+        if not hasattr(model, "gradient_checkpointing_enable"):
+            raise ValueError("This model does not support gradient checkpointing.")
+        model.gradient_checkpointing_enable()
+        set_config_use_cache(model, False)
 
     model.to(args.device)
 
@@ -700,11 +757,7 @@ def main():
         logger.info("Saving model checkpoint to %s", args.output_dir)
         # Save a trained model, configuration and tokenizer using `save_pretrained()`.
         # They can then be reloaded using `from_pretrained()`
-        model_to_save = (
-            model.module if hasattr(model, "module") else model
-        )  # Take care of distributed/parallel training
-        model_to_save.save_pretrained(args.output_dir)
-        tokenizer.save_pretrained(args.output_dir)
+        save_model_and_tokenizer(args, model, tokenizer, args.output_dir)
 
         # Good practice: save your training arguments together with the trained model
         torch.save(args, os.path.join(args.output_dir, "training_args.bin"))

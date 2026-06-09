@@ -20,6 +20,7 @@ runs/
 
 # Model artifacts (large files)
 model/
+models/
 output_model/
 *.bin
 *.pt

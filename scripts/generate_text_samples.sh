@@ -21,16 +21,16 @@ if [[ ! -x "$(command -v "${PYTHON_BIN}")" ]]; then
   exit 1
 fi
 
-MODEL_PATH="${MODEL_PATH:-output_model/gpt2-medium_finetuned}"
+MODEL_PATH="${MODEL_PATH:-models/gpt2-medium}"
 NUM_RETURN_SEQUENCES="${NUM_RETURN_SEQUENCES:-5}"
 MAX_LENGTH="${MAX_LENGTH:-128}"
 TEMPERATURE="${TEMPERATURE:-0.8}"
 STOP_TOKEN="${STOP_TOKEN:-<|endoftext|>}"
 
 PROMPTS=(
-  "[CLS] [DA]General_ChatIntent[/DA] [TOPIC]general[/TOPIC] I think I should buy a new jacket for winter. [SEP]"
-  "[CLS] [DA]General_ChatIntent[/DA] [TOPIC]general[/TOPIC] I just started a new job and I am a bit nervous. [SEP]"
-  "[CLS] [DA]General_ChatIntent[/DA] [TOPIC]other[/TOPIC] Can you recommend something fun to do this weekend? [SEP]"
+  "<bos><no emotion>I think I should buy a new jacket for winter.<sep><happiness>"
+  "<bos><fear>I just started a new job and I am a bit nervous.<sep><no emotion>"
+  "<bos><happiness>Can you recommend something fun to do this weekend?<sep><surprise>"
 )
 
 for prompt in "${PROMPTS[@]}"; do

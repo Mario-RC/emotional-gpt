@@ -46,9 +46,16 @@ required_keys = [
   "num_epochs",
   "train_batch_size",
   "eval_batch_size",
+  "gradient_accumulation_steps",
+  "gradient_checkpointing",
   "learning_rate",
   "logging_steps",
   "save_steps",
+  "save_total_limit",
+  "additional_special_tokens",
+  "pad_token",
+  "bos_token",
+  "eos_token",
   "overwrite_output_dir",
   "line_by_line",
 ]
@@ -71,6 +78,17 @@ if not all(isinstance(model, str) and model.strip() for model in allowed_models)
     f"All entries in 'allowed_models' must be non-empty strings in '{config_path}'."
   )
 
+additional_special_tokens = cfg["additional_special_tokens"]
+if not isinstance(additional_special_tokens, list):
+  raise SystemExit(
+    f"Key 'additional_special_tokens' must be a list in '{config_path}'."
+  )
+
+if not all(isinstance(token, str) and token.strip() for token in additional_special_tokens):
+  raise SystemExit(
+    f"All entries in 'additional_special_tokens' must be non-empty strings in '{config_path}'."
+  )
+
 def to_shell_value(value):
   if isinstance(value, bool):
     return "true" if value else "false"
@@ -85,9 +103,15 @@ mapping = {
   "CFG_NUM_EPOCHS": "num_epochs",
   "CFG_TRAIN_BATCH_SIZE": "train_batch_size",
   "CFG_EVAL_BATCH_SIZE": "eval_batch_size",
+  "CFG_GRADIENT_ACCUMULATION_STEPS": "gradient_accumulation_steps",
+  "CFG_GRADIENT_CHECKPOINTING": "gradient_checkpointing",
   "CFG_LEARNING_RATE": "learning_rate",
   "CFG_LOGGING_STEPS": "logging_steps",
   "CFG_SAVE_STEPS": "save_steps",
+  "CFG_SAVE_TOTAL_LIMIT": "save_total_limit",
+  "CFG_PAD_TOKEN": "pad_token",
+  "CFG_BOS_TOKEN": "bos_token",
+  "CFG_EOS_TOKEN": "eos_token",
   "CFG_OVERWRITE_OUTPUT_DIR": "overwrite_output_dir",
   "CFG_LINE_BY_LINE": "line_by_line",
 }
@@ -97,6 +121,7 @@ for env_name, key in mapping.items():
   print(f"{env_name}={shell_value}")
 
 print("CFG_ALLOWED_MODELS=" + shlex.quote(",".join(allowed_models)))
+print("CFG_ADDITIONAL_SPECIAL_TOKENS=" + shlex.quote(",".join(additional_special_tokens)))
 PY
 )"
 
@@ -109,11 +134,19 @@ EVAL_FILE="${EVAL_FILE:-${CFG_EVAL_FILE}}"
 NUM_EPOCHS="${NUM_EPOCHS:-${CFG_NUM_EPOCHS}}"
 TRAIN_BATCH_SIZE="${TRAIN_BATCH_SIZE:-${CFG_TRAIN_BATCH_SIZE}}"
 EVAL_BATCH_SIZE="${EVAL_BATCH_SIZE:-${CFG_EVAL_BATCH_SIZE}}"
+GRADIENT_ACCUMULATION_STEPS="${GRADIENT_ACCUMULATION_STEPS:-${CFG_GRADIENT_ACCUMULATION_STEPS}}"
+GRADIENT_CHECKPOINTING="${GRADIENT_CHECKPOINTING:-${CFG_GRADIENT_CHECKPOINTING}}"
 LEARNING_RATE="${LEARNING_RATE:-${CFG_LEARNING_RATE}}"
 LOGGING_STEPS="${LOGGING_STEPS:-${CFG_LOGGING_STEPS}}"
 SAVE_STEPS="${SAVE_STEPS:-${CFG_SAVE_STEPS}}"
+SAVE_TOTAL_LIMIT="${SAVE_TOTAL_LIMIT:-${CFG_SAVE_TOTAL_LIMIT}}"
+ADDITIONAL_SPECIAL_TOKENS="${ADDITIONAL_SPECIAL_TOKENS:-${CFG_ADDITIONAL_SPECIAL_TOKENS}}"
+PAD_TOKEN="${PAD_TOKEN:-${CFG_PAD_TOKEN}}"
+BOS_TOKEN="${BOS_TOKEN:-${CFG_BOS_TOKEN}}"
+EOS_TOKEN="${EOS_TOKEN:-${CFG_EOS_TOKEN}}"
 OVERWRITE_OUTPUT_DIR="${OVERWRITE_OUTPUT_DIR:-${CFG_OVERWRITE_OUTPUT_DIR}}"
 LINE_BY_LINE="${LINE_BY_LINE:-${CFG_LINE_BY_LINE}}"
+SHOULD_CONTINUE="${SHOULD_CONTINUE:-false}"
 
 IFS=',' read -r -a ALLOWED_MODELS <<< "${CFG_ALLOWED_MODELS}"
 MODEL_ALLOWED="false"
@@ -155,13 +188,39 @@ TRAIN_ARGS=(
   --output_dir "${OUTPUT_DIR}"
   --per_gpu_train_batch_size="${TRAIN_BATCH_SIZE}"
   --per_gpu_eval_batch_size="${EVAL_BATCH_SIZE}"
+  --gradient_accumulation_steps="${GRADIENT_ACCUMULATION_STEPS}"
   --logging_steps="${LOGGING_STEPS}"
   --save_steps="${SAVE_STEPS}"
+  --save_total_limit="${SAVE_TOTAL_LIMIT}"
   --learning_rate="${LEARNING_RATE}"
 )
 
+if [[ "${GRADIENT_CHECKPOINTING}" == "true" ]]; then
+  TRAIN_ARGS+=(--gradient_checkpointing)
+fi
+
+if [[ -n "${ADDITIONAL_SPECIAL_TOKENS}" ]]; then
+  TRAIN_ARGS+=(--additional_special_tokens "${ADDITIONAL_SPECIAL_TOKENS}")
+fi
+
+if [[ -n "${PAD_TOKEN}" ]]; then
+  TRAIN_ARGS+=(--pad_token "${PAD_TOKEN}")
+fi
+
+if [[ -n "${BOS_TOKEN}" ]]; then
+  TRAIN_ARGS+=(--bos_token "${BOS_TOKEN}")
+fi
+
+if [[ -n "${EOS_TOKEN}" ]]; then
+  TRAIN_ARGS+=(--eos_token "${EOS_TOKEN}")
+fi
+
 if [[ "${LINE_BY_LINE}" == "true" ]]; then
   TRAIN_ARGS+=(--line_by_line)
+fi
+
+if [[ "${SHOULD_CONTINUE}" == "true" ]]; then
+  TRAIN_ARGS+=(--should_continue)
 fi
 
 if [[ "${OVERWRITE_OUTPUT_DIR}" == "true" ]]; then
