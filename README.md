@@ -14,7 +14,7 @@ pip install -r requirements.txt
 
 ## Dataset Workflow
 
-### 1. Download raw CSV files
+### 1. Download source CSV files
 
  DAILYD resources source: [`CHANEL-JSALT-2020/datasets`](https://github.com/CHANEL-JSALT-2020/datasets) 
 
@@ -23,11 +23,11 @@ Required files:
 - `DAILYD_main.csv`
 - `DAILYD_dialoginfo.csv`
 
-### 2. Place raw files in the expected folder
+### 2. Place source files in the expected folder
 
 ```text
-data/raw/DAILYD_main.csv
-data/raw/DAILYD_dialoginfo.csv
+data/source/DAILYD_main.csv
+data/source/DAILYD_dialoginfo.csv
 ```
 
 ### 3. Build train/dev files
@@ -54,7 +54,7 @@ DailyDialog numeric emotion labels are mapped as:
 
 Default arguments in `src/build_dataset.py`:
 
-- `--data-dir data/raw`
+- `--data-dir data/source`
 - `--main-file DAILYD_main.csv`
 - `--info-file DAILYD_dialoginfo.csv`
 - `--output-dir data/gpt-dialogues`
@@ -66,7 +66,7 @@ Equivalent explicit command:
 
 ```bash
 python src/build_dataset.py \
-  --data-dir data/raw \
+  --data-dir data/source \
   --main-file DAILYD_main.csv \
   --info-file DAILYD_dialoginfo.csv \
   --output-dir data/gpt-dialogues \
@@ -207,14 +207,14 @@ emotional_gpt/
 │   └── train_model.json              # Training defaults and allowed models
 ├── data/
 │   ├── README.md                     # Dataset preparation notes
-│   └── gpt-dialogues/
+│   └── source/                       # Versioned source CSV files
 ├── scripts/
 │   ├── train_model.sh                # Launches training with config/env overrides
 │   └── generate_text_samples.sh      # Generates text from a fine-tuned checkpoint
 └── src/
-    ├── build_dataset.py              # Builds train/dev splits from raw CSV files
+    ├── build_dataset.py              # Builds train/dev splits from source CSV files
     ├── train_model.py                # Fine-tuning entrypoint
     └── generate_text.py              # Inference / text generation entrypoint
 ```
 
-Local artifacts such as `emo-model/`, `models/`, `output_model/`, `runs/`, and raw/generated dataset files are ignored by `.gitignore` and are not intended to be pushed to GitHub.
+Local artifacts such as `emo-model/`, `models/`, `output_model/`, `runs/`, and generated dataset files are ignored by `.gitignore` and are not intended to be pushed to GitHub.

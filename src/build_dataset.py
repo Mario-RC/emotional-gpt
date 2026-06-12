@@ -157,7 +157,7 @@ def build_samples(df: pd.DataFrame, dataset_format: str) -> list[str]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build train/dev files from DailyDialog CSV files.")
-    parser.add_argument("--data-dir", type=Path, default=Path("data/raw"), help="Directory with raw CSV files.")
+    parser.add_argument("--data-dir", type=Path, default=Path("data/source"), help="Directory with source CSV files.")
     parser.add_argument("--output-dir", type=Path, default=Path("data/gpt-dialogues"), help="Output directory.")
     parser.add_argument("--main-file", type=str, default="DAILYD_main.csv", help="Main CSV filename.")
     parser.add_argument("--info-file", type=str, default="DAILYD_dialoginfo.csv", help="Dialog info CSV filename.")

@@ -30,11 +30,8 @@ output_model/
 data/*
 !data/.gitkeep
 !data/README.md
-!data/gpt-dialogues/
-data/gpt-dialogues/*
-!data/gpt-dialogues/.gitkeep
-!data/raw/
-!data/raw/*.csv
+!data/source/
+!data/source/*.csv
 
 # Temporary / backups
 *.save
